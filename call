@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>YouTube 권한 연결</title>
+  <style>
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; padding: 24px; }
+    .box { max-width: 720px; margin: 0 auto; border: 1px solid #ddd; border-radius: 12px; padding: 18px; }
+    .muted { color: #666; }
+    code { background:#f6f6f6; padding:2px 6px; border-radius:6px; }
+    button { padding: 10px 14px; border-radius: 10px; border: 1px solid #333; background: #111; color: #fff; cursor: pointer; }
+  </style>
+</head>
+<body>
+  <div class="box">
+    <h2>YouTube 권한 연결</h2>
+    <p class="muted" id="status">준비 중...</p>
+    <p class="muted" style="font-size:14px;">
+      URL 예시: <code>https://github.com/hanyang3d/yt-token</code>
+    </p>
+    <button id="goBtn" style="display:none;">권한 요청하기</button>
+  </div>
+
+<script>
+  // ====== 설정값 ======
+  const GOOGLE_AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth";
+  const CLIENT_ID = "655863345139-61h9r8uca785vnuc582fg9o5gjoqau5g.apps.googleusercontent.com";
+
+  // Make Custom Webhook URL (이 URL이 redirect_uri가 됩니다)
+  const REDIRECT_URI = "https://hook.eu1.make.com/v25fx5lqmabatg818w61w2koa3lbdb9c";
+
+  // YouTube 권한 스코프: 필요 최소로 조정하세요.
+  // 읽기만이면 readonly 권장. 업로드/관리 필요하면 scope 변경.
+  const SCOPES = [
+    "https://www.googleapis.com/auth/youtube"
+  ];
+
+  // ====== 유틸 ======
+  function base64urlEncode(str) {
+    const b64 = btoa(unescape(encodeURIComponent(str)));
+    return b64.replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
+  }
+
+  function getQueryParam(name) {
+    const url = new URL(window.location.href);
+    return url.searchParams.get(name);
+  }
+
+  function buildAuthUrl(company) {
+    // state에는 회사명 + 콜백 후 돌아올 페이지(선택) + CSRF용 nonce를 넣습니다.
+    const stateObj = {
+      company,
+      returnTo: window.location.origin + window.location.pathname,
+      nonce: crypto.getRandomValues(new Uint32Array(4)).join("-"),
+      ts: Date.now()
+    };
+    const state = base64urlEncode(JSON.stringify(stateObj));
+
+    const params = new URLSearchParams({
+      client_id: CLIENT_ID,
+      redirect_uri: REDIRECT_URI,
+      response_type: "code",
+      scope: SCOPES.join(" "),
+      access_type: "offline",   // refresh token 목적
+      prompt: "consent",        // refresh token 누락 방지 목적(재승인 유도)
+      include_granted_scopes: "true",
+      state
+    });
+
+    return `${GOOGLE_AUTH_URL}?${params.toString()}`;
+  }
+
+  // ====== 실행 ======
+  (function init() {
+    const statusEl = document.getElementById("status");
+    const goBtn = document.getElementById("goBtn");
+
+    const company = getQueryParam("company");
+    if (!company) {
+      statusEl.textContent = "company 파라미터가 없습니다. 예: ?company=HY3D";
+      return;
+    }
+
+    const authUrl = buildAuthUrl(company);
+
+    // 자동으로 바로 띄우고 싶으면 아래 주석 해제
+    window.location.href = authUrl;
+
+    // 수동 버튼 방식으로 하고 싶으면 위 줄을 주석 처리하고 아래를 사용
+    // statusEl.textContent = `회사명: ${company} — 아래 버튼을 눌러 권한을 요청하세요.`;
+    // goBtn.style.display = "inline-block";
+    // goBtn.addEventListener("click", () => window.location.href = authUrl);
+  })();
+</script>
+</body>
+</html>
